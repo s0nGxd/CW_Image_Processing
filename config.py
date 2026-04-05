@@ -18,7 +18,7 @@ STUDENT_MASKS_DIR = os.path.join(BASE_DIR, "student_mask")
 # Pipeline Parameters
 # Optimal tested params can be stored here
 COLOR_SPACE_METHOD = 'HSV_S' # Test: 'HSV_S', 'LAB_A', 'GRAY_INV'
-BLUR_KERNEL_SIZE = (7, 7)
+BLUR_KERNEL_SIZE = (9, 9)
 MORPH_SE_SIZE = (5, 5)
 MIN_AREA_THRESHOLD = 1000
 

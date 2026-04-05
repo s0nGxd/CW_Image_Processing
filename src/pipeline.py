@@ -154,9 +154,9 @@ def score_mask(mask, contour, img_shape):
     area_ratio = fg_pixels / total_pixels
 
     # --- Area score: ideal cell is 2-15% of image ---
-    if 0.02 <= area_ratio <= 0.15:
+    if 0.02 <= area_ratio <= 0.25:
         area_score = 1.0
-    elif 0.01 <= area_ratio < 0.02 or 0.15 < area_ratio <= 0.25:
+    elif 0.01 <= area_ratio < 0.02 or 0.25 < area_ratio <= 0.35:
         area_score = 0.6
     elif area_ratio > 0.5:
         area_score = 0.0  # clearly wrong
@@ -363,7 +363,7 @@ def _refine_mask_edges(img_rgb, mask):
         gc_mask[sure_fg > 0] = cv2.GC_FGD
 
         # Dilate to get definite background
-        sure_bg = cv2.dilate(mask, kernel, iterations=5)
+        sure_bg = cv2.dilate(mask, kernel, iterations=10)
         gc_mask[sure_bg == 0] = cv2.GC_BGD
 
         bgd_model = np.zeros((1, 65), np.float64)
