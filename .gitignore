@@ -26,3 +26,5 @@ Ground Truth/
 
 # Optional: ignore PDFs if you don't want coursework sheets in repo
 *.pdf
+
+*.whl
