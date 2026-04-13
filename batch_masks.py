@@ -31,8 +31,27 @@ def batch_process():
         # The prompt says: "generate mask of the PMY ... feed into semantic eval"
         # The SDK expects all masks.
         
-        images = [f for f in os.listdir(cls_dir) if f.lower().endswith('.jpg')] # Using .jpg to avoid duplicates (.png)
-        print(f"Processing class [{cls}] - {len(images)} images")
+        all_files = [f for f in os.listdir(cls_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        
+        # Group files by their base name (ignoring extension) to handle duplicates
+        base_dict = {}
+        for f in all_files:
+            base = os.path.splitext(f)[0]
+            if base not in base_dict:
+                base_dict[base] = []
+            base_dict[base].append(f)
+            
+        images = []
+        for base, files in base_dict.items():
+            pngs = [f for f in files if f.lower().endswith('.png')]
+            jpgs = [f for f in files if f.lower().endswith(('.jpg', '.jpeg'))]
+            
+            if pngs:
+                images.append(pngs[0]) # Prioritize .png
+            elif jpgs:
+                images.append(jpgs[0])
+                
+        print(f"Processing class [{cls}] - {len(images)} unique images found (prioritizing .png where duplicates exist)")
         
         for i, img_name in enumerate(images):
             img_path = os.path.join(cls_dir, img_name)
