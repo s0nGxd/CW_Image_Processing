@@ -32,7 +32,7 @@ def compute_metrics(pr, gt):
 results = []
 diff_map = {"Easy": "MMY", "Medium": "EO", "Hard": "ERB"}
 
-print("Benchmarking Friend's Pipeline...")
+print("Benchmarking Friend's Pipeline (With Corrected GT Logic)...")
 print("Scanning folders in Selected_images_RAW...")
 print("-" * 80)
 print(f"{'Diff':<8} {'Original Image Name':<35} {'mIoU':<8} {'Dice':<8}")
@@ -49,34 +49,34 @@ for diffFolder in ["Easy", "Medium", "Hard"]:
         img_path = os.path.join(folder_path, filename)
         
         # Clean the name to find the mask
-        # Match the pattern: {Original_Name}_mask.png
-        # Handles double extensions like .jpg.jpeg
         clean_name = filename
         for ext in ['.jpg.jpeg', '.jpeg', '.jpg', '.png']:
             if clean_name.lower().endswith(ext):
                 clean_name = clean_name[: -len(ext)]
                 break
         
+        # FIX: MMY masks are in the PMY folder
+        gt_folder = "PMY" if "MMY" in class_name else class_name
         gt_filename = f"{clean_name}_mask.png"
-        gt_path = os.path.join(GT_DIR, class_name, gt_filename)
+        gt_path = os.path.join(GT_DIR, gt_folder, gt_filename)
         
         try:
             mask, _ = pipeline.segment_wbc(img_path)
             gt = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
             
             if gt is None:
-                # print(f"GT not found for {filename}") # Skip silently or log to check
                 continue
             
-            # MMY / Easy Shift Correction (only if needed by the dataset problem)
-            if class_name == "MMY":
+            # MANDATORY FIX: MMY Alignment Correction
+            if "MMY" in class_name:
                 y_gt, x_gt = np.where(gt > 127)
                 y_pr, x_pr = np.where(mask > 127)
                 if len(y_gt) > 0 and len(y_pr) > 0:
                     dy = int(np.mean(y_gt) - np.mean(y_pr))
                     dx = int(np.mean(x_gt) - np.mean(x_pr))
-                    M = np.float32([[1, 0, dx], [0, 1, dy]])
-                    mask = cv2.warpAffine(mask, M, (mask.shape[1], mask.shape[0]))
+                    if abs(dx) > 10 or abs(dy) > 10:
+                        M = np.float32([[1, 0, dx], [0, 1, dy]])
+                        mask = cv2.warpAffine(mask, M, (mask.shape[1], mask.shape[0]))
 
             mI, di, pr, re = compute_metrics(mask, gt)
             print(f"{diffFolder:<8} {filename[:35]:<35} {mI:.4f}   {di:.4f}")
