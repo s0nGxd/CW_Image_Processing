@@ -10,10 +10,10 @@ DATASET_DIR = os.path.join(PARENT_DIR, "Naturalize Dataset", "Naturalize Dataset
 GROUND_TRUTH_DIR = os.path.join(PARENT_DIR, "Ground Truth", "Ground Truth")
 
 # Outputs
-OUTPUT_PIPELINE_DIR = os.path.join(BASE_DIR, "002 - Image Processing Pipeline")
-OUTPUT_IMAGES_DIR = os.path.join(BASE_DIR, "003 - Output Images")
 RESULTS_DIR = os.path.join(BASE_DIR, "Results 2026 IIP - GroupXXX") # Output folder specifically requested
-STUDENT_MASKS_DIR = os.path.join(BASE_DIR, "student_mask")
+OUTPUT_PIPELINE_DIR = os.path.join(RESULTS_DIR, "002 - Image Processing Pipeline")
+OUTPUT_IMAGES_DIR = os.path.join(RESULTS_DIR, "003 - Output Images")
+STUDENT_MASKS_DIR = os.path.join(RESULTS_DIR, "student_mask")
 
 # Pipeline Parameters
 # Optimal tested params can be stored here

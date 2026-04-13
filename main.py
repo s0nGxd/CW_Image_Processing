@@ -14,7 +14,16 @@ def main():
     print("="*60)
     print("COMP2032 Image Processing Pipeline")
     print("="*60)
-    print("Initializing directories...")
+    print("Initializing submission directory...")
+    # Clean/Reset the final Results folder at the start
+    utils.clear_dir(config.RESULTS_DIR)
+    
+    # 1. Copy Input Images (001) to the submission folder immediately
+    dest_001 = os.path.join(config.RESULTS_DIR, "001 - Input Images")
+    if os.path.exists(config.CURATED_IMAGES_DIR):
+        shutil.copytree(config.CURATED_IMAGES_DIR, dest_001)
+    
+    # Setup subdirectories for the pipeline and outputs (now inside RESULTS_DIR)
     utils.init_output_dirs(config.OUTPUT_IMAGES_DIR, config.OUTPUT_PIPELINE_DIR)
     
     results = []
@@ -61,33 +70,20 @@ def main():
             out_path = os.path.join(output_diff_dir, out_filename)
             utils.save_image(output_img, out_path)
             print(f"    -> Saved output to {out_filename}")
-            
+
             # Evaluate using Ground Truth
             try:
                 class_name = base_name.split(' ')[0]
                 # User note: MMY masks for 'Easy' are located in the 'PMY' folder
                 gt_folder = "PMY" if "MMY" in class_name else class_name
-                
+
                 # GT name format is "*_mask.png"
                 gt_path = os.path.join(config.GROUND_TRUTH_DIR, gt_folder, f"{base_name}_mask.png")
-                
+
                 if os.path.exists(gt_path):
                     gt_img = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
                     if gt_img is not None:
-                        # MANDATORY FIX: MMY Dataset has a systemic coordinate offset
-                        # We apply a centroid-alignment shift so metrics are valid
-                        final_eval_mask = final_mask.copy()
-                        if "MMY" in class_name:
-                            y_gt, x_gt = np.where(gt_img > 127)
-                            y_pr, x_pr = np.where(final_mask > 127)
-                            if len(y_gt) > 0 and len(y_pr) > 0:
-                                dy = int(np.mean(y_gt) - np.mean(y_pr))
-                                dx = int(np.mean(x_gt) - np.mean(x_pr))
-                                if abs(dx) > 10 or abs(dy) > 10:
-                                    M = np.float32([[1, 0, dx], [0, 1, dy]])
-                                    final_eval_mask = cv2.warpAffine(final_mask, M, (final_mask.shape[1], final_mask.shape[0]))
-
-                        metrics = evaluate.compute_metrics(final_eval_mask, gt_img)
+                        metrics = evaluate.compute_metrics(final_mask, gt_img)
                         metrics['Image'] = base_name
                         metrics['Difficulty'] = difficulty
                         results.append(metrics)
@@ -101,21 +97,7 @@ def main():
 
     evaluate.print_summary(results)
     
-    # Generate the group deliverables layout
-    print("\nPreparing Group Submission Folder...")
-    utils.clear_dir(config.RESULTS_DIR)
-    
-    # Copy directories handling exceptions if source doesn't exist
-    for src_dir, dest_name in [
-        (config.CURATED_IMAGES_DIR, "001 - Input Images"),
-        (config.OUTPUT_PIPELINE_DIR, "002 - Image Processing Pipeline"),
-        (config.OUTPUT_IMAGES_DIR, "003 - Output Images")
-    ]:
-         dest_path = os.path.join(config.RESULTS_DIR, dest_name)
-         if os.path.exists(src_dir):
-             shutil.copytree(src_dir, dest_path)
-             
-    print(f"Completed! Deliverables are packed in: {os.path.basename(config.RESULTS_DIR)}")
+    print(f"\nCompleted! All deliverables are ready in the folder: {os.path.basename(config.RESULTS_DIR)}")
 
 if __name__ == "__main__":
     main()

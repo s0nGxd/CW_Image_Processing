@@ -74,6 +74,30 @@ def extract_channel(img_rgb, method):
         return 255 - cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
 
+def apply_clahe(img_rgb, clip_limit=2.0, tile_grid=(8, 8)):
+    """
+    Adaptive Histogram Equalization (CLAHE) pre-processing step.
+
+    Applies Contrast Limited Adaptive Histogram Equalization to the
+    Luminance (L*) channel of the CIELAB colour space.  This improves
+    local contrast across the image without over-amplifying noise,
+    making the WBC stand out more clearly from the stained background.
+
+    Lecture technique: CV Histogram Equalization / Adaptive HE.
+    """
+    # Convert RGB -> LAB
+    lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
+    l_ch, a_ch, b_ch = cv2.split(lab)
+
+    # Apply CLAHE on the L channel only
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid)
+    l_eq = clahe.apply(l_ch)
+
+    # Merge back and convert to RGB
+    lab_eq = cv2.merge([l_eq, a_ch, b_ch])
+    return cv2.cvtColor(lab_eq, cv2.COLOR_LAB2RGB)
+
+
 def reduce_noise(channel, kernel_size=(5, 5)):
     """Gaussian or bilateral blur for noise suppression."""
     if kernel_size == "bilateral":
@@ -298,10 +322,17 @@ def run_pipeline(img_rgb, method=None, blur_k=(7, 7), morph_se=(5, 5),
     best_stages = {}
     best_name = "none"
 
+    # -----------------------------------------------------------------------
+    # PRE-PROCESSING: Adaptive Histogram Equalization (CLAHE)
+    # Enhances local contrast on the Luminance channel before any strategy
+    # runs. Lecture technique: CV Adaptive Histogram Equalization.
+    # -----------------------------------------------------------------------
+    img_clahe = apply_clahe(img_rgb)
+
     strategies = _build_strategies()
 
     # Also include K-means as a special strategy
-    kmeans_mask_raw = kmeans_segment(img_rgb, k=3)
+    kmeans_mask_raw = kmeans_segment(img_clahe, k=3)
     kmeans_cleaned = morphological_cleanup(kmeans_mask_raw, (5, 5))
     kmeans_final, kmeans_contour = keep_best_contour(kmeans_cleaned, min_area, fill_holes=True)
     kmeans_score = score_mask(kmeans_final, kmeans_contour, img_rgb.shape)
@@ -313,8 +344,8 @@ def run_pipeline(img_rgb, method=None, blur_k=(7, 7), morph_se=(5, 5),
 
     for name, ch_method, thresh_fn, bk, ms, ma in strategies:
         try:
-            mask, contour, stages = _run_single_strategy(img_rgb, ch_method, thresh_fn, bk, ms, ma)
-            s = score_mask(mask, contour, img_rgb.shape)
+            mask, contour, stages = _run_single_strategy(img_clahe, ch_method, thresh_fn, bk, ms, ma)
+            s = score_mask(mask, contour, img_clahe.shape)
             candidate_results.append((name, mask, contour, s, stages))
         except Exception:
             pass
@@ -376,7 +407,6 @@ def _refine_mask_edges(img_rgb, mask):
         gc_mask = np.where(mask > 0, cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype(np.uint8)
 
         # Fixed, empirically-tuned margins: erode=2 (tight sure-fg), dilate=8 (generous uncertain zone)
-        # Proportional scaling was tried but caused regression on compact ERB cells.
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
         sure_fg = cv2.erode(mask, kernel, iterations=2)
         gc_mask[sure_fg > 0] = cv2.GC_FGD
@@ -396,11 +426,11 @@ def _refine_mask_edges(img_rgb, mask):
         refined = morphological_cleanup(refined, (3, 3))
         refined, _ = keep_best_contour(refined, 300)
 
-        # Sanity check: refined should be somewhere close in size to original 
+        # Refined should be somewhere close in size to original
         orig_area = np.sum(mask > 0)
         new_area = np.sum(refined > 0)
         if new_area == 0 or new_area > orig_area * 3 or new_area < orig_area * 0.2:
-            return mask  # GrabCut went crazy; fall back
+            return mask
 
         return refined
     except Exception:
