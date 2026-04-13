@@ -271,22 +271,24 @@ def _run_single_strategy(img_rgb, channel_method, threshold_fn, blur_k, morph_se
 
 
 def _build_strategies():
-    """Return a list of (name, channel, threshold_fn, blur_kernel, morph_se, min_area) tuples."""
+    """Return a list of (name, channel, threshold_fn, blur_kernel, morph_se, min_area) tuples.
+
+    Each strategy is chosen deliberately for a specific reason:
+      1. HSV_S + Gaussian + Otsu   — baseline for well-stained cells (high saturation contrast)
+      2. LAB_A + Gaussian + Otsu   — directly captures the magenta stain on the A* axis
+      3. LAB_A + Bilateral + Otsu  — same channel, edge-preserving blur for cleaner boundaries
+      4. ColDist + Gaussian + Otsu — background-adaptive; handles slide colour variation
+      5. LAB_A + Gaussian + Adapt  — handles uneven microscope illumination via local threshold
+    Strategy 6 (K-Means k=3) is handled separately in run_pipeline.
+    """
     return [
-        # (name,         channel,     thresh_fn,        blur_k,  morph_se, min_area)
-        ("HSV_S+Otsu",   "HSV_S",     threshold_otsu,   (7, 7),  (5, 5),   500),
-        ("LAB_A+Otsu",   "LAB_A",     threshold_otsu,   (7, 7),  (5, 5),   500),
-        ("ColDist+Otsu", "COL_DIST",  threshold_otsu,   (7, 7),  (5, 5),   500),
-        ("GrayInv+Otsu", "GRAY_INV",  threshold_otsu,   (7, 7),  (5, 5),   500),
-        ("HSV_S+Adapt",  "HSV_S",     lambda b: threshold_adaptive(b, 51, 7),
-                                                         (7, 7),  (5, 5),   500),
-        ("ColDist+Adapt","COL_DIST",  lambda b: threshold_adaptive(b, 51, 7),
-                                                         (7, 7),  (5, 5),   500),
-        ("ColDist+Otsu_sm", "COL_DIST", threshold_otsu, (5, 5),  (3, 3),   300),
-        ("LAB_A+Adapt",  "LAB_A",     lambda b: threshold_adaptive(b, 51, 5),
-                                                         (7, 7),  (7, 7),   500),
-        ("HSV_S+Bilat",  "HSV_S",     threshold_otsu,   "bilateral", (5, 5),   500),
-        ("LAB_A+Bilat",  "LAB_A",     threshold_otsu,   "bilateral", (5, 5),   500),
+        # (name,              channel,    thresh_fn,       blur_k,       morph_se, min_area)
+        ("HSV_S+Otsu",        "HSV_S",    threshold_otsu,  (7, 7),       (5, 5),   500),
+        ("LAB_A+Otsu",        "LAB_A",    threshold_otsu,  (7, 7),       (5, 5),   500),
+        ("LAB_A+Bilat+Otsu",  "LAB_A",    threshold_otsu,  "bilateral",  (5, 5),   500),
+        ("ColDist+Otsu",      "COL_DIST", threshold_otsu,  (7, 7),       (5, 5),   500),
+        ("LAB_A+Adapt",       "LAB_A",    lambda b: threshold_adaptive(b, 51, 5),
+                                                           (7, 7),       (7, 7),   500),
     ]
 
 
