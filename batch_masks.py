@@ -51,12 +51,25 @@ def batch_process():
             elif jpgs:
                 images.append(jpgs[0])
                 
-        print(f"Processing class [{cls}] - {len(images)} unique images found (prioritizing .png where duplicates exist)")
-        
+        # Ensure subfolder exists for this class to satisfy SDK triple matching
+        cls_mask_dir = os.path.join(config.STUDENT_MASKS_DIR, cls)
+        if not os.path.exists(cls_mask_dir):
+            os.makedirs(cls_mask_dir)
+            
         for i, img_name in enumerate(images):
             img_path = os.path.join(cls_dir, img_name)
             
             try:
+                # Format required by SDK: original_name_plus_mymask  "image_1_mymask.png"
+                base_name = os.path.splitext(img_name)[0]
+                mask_filename = f"{base_name}_mymask.png"
+                mask_path = os.path.join(cls_mask_dir, mask_filename)
+                
+                # Check if already exists from a previous run to allow resumption
+                if os.path.exists(mask_path):
+                    total_processed += 1
+                    continue
+
                 img_rgb = utils.load_image(img_path)
                 if img_rgb is None:
                     total_errors += 1
@@ -71,11 +84,6 @@ def batch_process():
                     min_area=config.MIN_AREA_THRESHOLD,
                     save_stages_dir=None
                 )
-                
-                # Format required by SDK: original_name_plus_mymask  "image_1_mymask.png"
-                base_name = img_name.split('.')[0]
-                mask_filename = f"{base_name}_mymask.png"
-                mask_path = os.path.join(config.STUDENT_MASKS_DIR, mask_filename)
                 
                 # Save just the binary mask
                 utils.save_image(final_mask, mask_path, is_rgb=False)
