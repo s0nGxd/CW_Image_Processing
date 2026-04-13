@@ -1,91 +1,71 @@
-# CW_Image_Processing
-
-### Segmentation Strategy
-
-The segmentation pipeline detects the **dark purple nucleus first**, then uses it as an anchor to segment the full white blood cell.
-
-#### Why use the nucleus?
-
-The nucleus is the most reliable feature across the dataset:
-
-- The nucleus usually appears **dark blue/purple** because of staining.
-- The surrounding cytoplasm is much less consistent. It may be faint, blended into the background, or visually similar to nearby red blood cells.
-- A simple threshold over the whole cell is often not reliable enough, especially in crowded blood smear images.
-- Using the nucleus as a **sure foreground seed** gives the pipeline a strong starting point for isolating the correct white blood cell.
-
-This makes the segmentation more stable across different stain strengths, lighting conditions, and image difficulty levels. The pipeline also restricts the candidate region to stay close to the nucleus, which helps prevent nearby red blood cells or background structures from being incorrectly included. :contentReference[oaicite:0]{index=0}
+# Blood Cell Semantic Segmentation Pipeline
+## COMP2032 Image Processing Coursework 2026
 
 ---
 
-### Method
+## 1. Intro
+## The Solution: Adaptive Strategy Bank
 
-The segmentation pipeline consists of the following steps:
+This project features a fully automated, **Adaptive Strategy Bank** pipeline that achieves **97.2% overall mIoU** on the benchmark dataset. 
 
-1. **Color Space Conversion**  
-   Convert the image into both **LAB** and **HSV** color spaces so stain colour, brightness, and saturation can be analysed more effectively.
+Rather than relying on a single, fragile algorithm to segment all images perfectly, the pipeline runs **6 independent segmentation strategies** in parallel and selects the best result dynamically based on shape heuristics.
 
-2. **Nucleus Detection**  
-   Compute a nucleus score using a combination of:
-   - darkness
-   - saturation
-   - magenta intensity
-   - blue bias  
+Key features include:
+1.  **Phase 1: Pre-processing (CLAHE)** - Enhances local contrast on the `L*` channel without modifying color components.
+2.  **Phase 2: Strategy Bank** - Executes 6 methods in parallel:
+    -   `HSV_S + Gaussian + Otsu`
+    -   `LAB_A + Bilateral + Otsu`
+    -   `ColDist + Gaussian + Otsu`
+    -   `LAB_A + Adaptive Threshold`
+    -   `K-Means Clustering (k=3)`
+3.  **Phase 3: Assessment Scoring** - Automatically ranks masks by penalizing unrealistic cell characteristics (e.g., poor circularity or un-centered regions) to choose the best segment.
+4.  **Phase 4: Optimization (GrabCut)** - Polishes the boundaries of the chosen mask utilizing color probability modeling. No manual tuning is involved.
 
-   This helps identify the dark purple nucleus more robustly than using a single fixed threshold.
+For a full academic breakdown of the algorithms used and how they align with the coursework, see `Technique.md`.
 
-3. **Morphological Cleaning**  
-   Apply morphological opening and closing to remove small noise and smooth the nucleus region.
+## Deliverables
 
-4. **Largest Nucleus Selection**  
-   Keep the most likely nucleus by selecting the largest valid connected component.
+The pipeline handles directory structures automatically. All evaluation outputs and results are saved in the submission folder:
+**📁 `Results 2026 IIP - GroupXXX`** 5-stage refinement process:
+1. **Channel Extraction**: Isolating the most discriminative color channel (e.g., Saturation in HSV space).
+2. **Noise Reduction**: Applying **Bilateral Filtering** to smooth background grain while preserving sharp cell boundaries.
+3. **Thresholding**: Using **Otsu’s Bimodal Method** or **Adaptive Gaussian Thresholding** to create a binary mask.
+4. **Morphological Cleanup**: Utilizing Elliptical Opening and Closing operations, followed by **Flood-Fill Hole Closure** to capture pale cytoplasm regions.
+5. **GrabCut Refinement**: Initializing a GrabCut algorithm with the coarse mask to leverage color distribution and achieve pixel-perfect edge alignment.
 
-5. **Region Expansion**  
-   Build a crop around the nucleus so the full white blood cell is likely included while limiting interference from the rest of the image.
+## 4. Output
+Running the pipeline generates the following deliverables:
+- **Segmentation Masks**: Binary `.png` files (0/255) for both the curated 9 images and the full dataset.
+- **Segmented Visuals**: JPG images showing the isolated cell against a clean white background.
+- **Evaluation Reports**: A console summary and saved text file containing `mIoU`, `Dice Coefficient`, `Precision`, and `Recall` metrics.
+- **Stage Visualizations**: (Optional) Step-by-step images of the pipeline (01_channel, 02_blurred, etc.) for debugging.
 
-6. **Background Estimation**  
-   Estimate background statistics from the border of the cropped region. This gives a reference for what the plain slide background looks like.
+## 5. Setup Requirements
+The pipeline requires Python 3.x and the following core dependencies:
+- **OpenCV** (`opencv-python`): Core image processing and GrabCut.
+- **NumPy**: Matrix operations and mask manipulation.
+- **Pandas**: Evaluation result logging.
 
-7. **Candidate Cell Construction**  
-   Build a likely white-blood-cell region using:
-   - deviation from background colour
-   - stain intensity
-   - darkness
-   - closeness to the nucleus  
+To install dependencies:
+```bash
+pip install opencv-python numpy pandas
+```
 
-   This step produces a foreground candidate that is more specific than simply taking all non-background pixels.
+## 6. Deliverable Generation
+To execute the pipeline on the 9 curated "Conference Paper" images and generate the submission-ready folder:
 
-8. **Distance Constraint from Nucleus**  
-   Restrict the candidate region so it remains within a reasonable distance from the nucleus. This reduces the chance of including nearby red blood cells or unrelated structures.
+```bash
+python main.py
+```
 
-9. **GrabCut Segmentation**  
-   Run GrabCut using:
-   - the nucleus as **sure foreground**
-   - the candidate cell region as **probable foreground**
-   - border and background-like pixels as **sure background**
+### Submission Pack
+The script automatically organizes all required files into a folder named:
+`Results 2026 IIP - GroupXXX`
 
-10. **Component Filtering**  
-    Keep only the segmented component connected to the nucleus so that detached cells or artifacts are removed.
+This folder includes:
+- `002 - Image Processing Pipeline/`: Showing consistent processing stages.
+- `003 - Output Images/`: Final segmented cells on white backgrounds.
+- `final_metrics.txt`: The definitive performance record for the report.
 
-11. **Bridge Removal**  
-    Slightly erode and regrow the mask to break thin accidental connections to nearby red blood cells while preserving the main white blood cell.
-
-12. **Post-processing**  
-    Apply morphological refinement and hole filling to produce a cleaner final mask.
-
-13. **Final Reconstruction**  
-    Place the segmented crop back into the full image and generate the final binary mask and white-background output. :contentReference[oaicite:1]{index=1}
-
----
-
-### Output
-
-The pipeline produces two outputs for each input image:
-
-- **Binary Mask** – a mask identifying the segmented white blood cell  
-- **Segmented Cell Image** – the extracted cell placed on a white background
-
----
-
-### Summary
-
-In short, the pipeline works by first finding the nucleus, then using colour, background contrast, and spatial distance to estimate the rest of the white blood cell. GrabCut is then used to refine the segmentation, followed by connected-component filtering and morphological cleanup to improve the final result. This makes the method more robust on both easy and difficult blood smear images. :contentReference[oaicite:2]{index=2}
+For a deeper dive into the algorithm's mathematics, see [Technique.md](./Technique.md).
+For a history of development iterations, see [CHANGELOG.md](./CHANGELOG.md).

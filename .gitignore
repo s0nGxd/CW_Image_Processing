@@ -1,31 +1,13 @@
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Virtual environments
-venv/
+/Results 2026 IIP - GroupXXX
+/002 - Image Processing Pipeline
+/003 - Output Images
+# IDE and environment folders
+.idea/
 .venv/
-env/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# VS Code
 .vscode/
 
-# Large datasets / generated files
-Naturalize Dataset/
-Literature_Review/
-Ground Truth/
-
-# Optional: ignore PDFs if you don't want coursework sheets in repo
-*.pdf
-
-*.whl
-/.idea
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
