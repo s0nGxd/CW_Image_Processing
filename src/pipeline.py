@@ -75,7 +75,9 @@ def extract_channel(img_rgb, method):
 
 
 def reduce_noise(channel, kernel_size=(5, 5)):
-    """Gaussian blur for noise suppression."""
+    """Gaussian or bilateral blur for noise suppression."""
+    if kernel_size == "bilateral":
+        return cv2.bilateralFilter(channel, 9, 75, 75)
     return cv2.GaussianBlur(channel, kernel_size, 0)
 
 
@@ -100,8 +102,22 @@ def morphological_cleanup(binary, se_size=(5, 5)):
     return opened
 
 
-def keep_best_contour(binary, min_area=300):
-    """Keep only the largest contour (filled) above min_area."""
+def keep_best_contour(binary, min_area=300, fill_holes=False):
+    """Keep only the largest contour (filled) above min_area.
+    
+    fill_holes: if True, run a flood-fill pass to close internal gaps before
+                finding contours.  Only use on the main strategy selection pass,
+                NOT inside GrabCut cleanup (recursive amplification risk).
+    """
+    if fill_holes:
+        # Flood-fill from corner to detect enclosed interior holes
+        h, w = binary.shape
+        flood_filled = binary.copy()
+        mask_ff = np.zeros((h + 2, w + 2), np.uint8)
+        cv2.floodFill(flood_filled, mask_ff, (0, 0), 255)
+        holes = cv2.bitwise_not(flood_filled)
+        binary = cv2.bitwise_or(binary, holes)
+
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return np.zeros_like(binary), None
@@ -170,13 +186,13 @@ def score_mask(mask, contour, img_shape):
         circularity = 4 * np.pi * area / (perimeter ** 2)
     else:
         circularity = 0
-    circ_score = min(circularity / 0.85, 1.0)  # 0.85+ is very circular
+    circ_score = min(circularity / 0.60, 1.0)  # 0.60+ is perfectly acceptable since cells can be irregular
 
     # --- Solidity score ---
     hull = cv2.convexHull(contour)
     hull_area = cv2.contourArea(hull)
     solidity = area / (hull_area + 1e-6)
-    solidity_score = min(solidity / 0.90, 1.0)
+    solidity_score = min(solidity / 0.85, 1.0)
 
     # --- Centredness score (cell should be roughly in image centre) ---
     M = cv2.moments(contour)
@@ -191,10 +207,10 @@ def score_mask(mask, contour, img_shape):
 
     # Weighted combination
     score = (
-        0.30 * area_score
-        + 0.30 * circ_score
-        + 0.20 * solidity_score
-        + 0.20 * centredness
+        0.40 * area_score
+        + 0.20 * circ_score
+        + 0.25 * solidity_score
+        + 0.15 * centredness
     )
     return score
 
@@ -224,7 +240,7 @@ def _run_single_strategy(img_rgb, channel_method, threshold_fn, blur_k, morph_se
     stages["04_morphology"] = cleaned
 
     # 5. Largest contour
-    mask, contour = keep_best_contour(cleaned, min_area)
+    mask, contour = keep_best_contour(cleaned, min_area, fill_holes=True)
     stages["05_mask"] = mask
 
     return mask, contour, stages
@@ -245,6 +261,8 @@ def _build_strategies():
         ("ColDist+Otsu_sm", "COL_DIST", threshold_otsu, (5, 5),  (3, 3),   300),
         ("LAB_A+Adapt",  "LAB_A",     lambda b: threshold_adaptive(b, 51, 5),
                                                          (7, 7),  (7, 7),   500),
+        ("HSV_S+Bilat",  "HSV_S",     threshold_otsu,   "bilateral", (5, 5),   500),
+        ("LAB_A+Bilat",  "LAB_A",     threshold_otsu,   "bilateral", (5, 5),   500),
     ]
 
 
@@ -285,7 +303,7 @@ def run_pipeline(img_rgb, method=None, blur_k=(7, 7), morph_se=(5, 5),
     # Also include K-means as a special strategy
     kmeans_mask_raw = kmeans_segment(img_rgb, k=3)
     kmeans_cleaned = morphological_cleanup(kmeans_mask_raw, (5, 5))
-    kmeans_final, kmeans_contour = keep_best_contour(kmeans_cleaned, min_area)
+    kmeans_final, kmeans_contour = keep_best_contour(kmeans_cleaned, min_area, fill_holes=True)
     kmeans_score = score_mask(kmeans_final, kmeans_contour, img_rgb.shape)
 
     candidate_results = [("KMeans_k3", kmeans_final, kmeans_contour, kmeans_score,
@@ -357,13 +375,14 @@ def _refine_mask_edges(img_rgb, mask):
         # Build GrabCut init mask
         gc_mask = np.where(mask > 0, cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype(np.uint8)
 
-        # Erode to get definite foreground
+        # Fixed, empirically-tuned margins: erode=2 (tight sure-fg), dilate=8 (generous uncertain zone)
+        # Proportional scaling was tried but caused regression on compact ERB cells.
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-        sure_fg = cv2.erode(mask, kernel, iterations=3)
+        sure_fg = cv2.erode(mask, kernel, iterations=2)
         gc_mask[sure_fg > 0] = cv2.GC_FGD
 
         # Dilate to get definite background
-        sure_bg = cv2.dilate(mask, kernel, iterations=10)
+        sure_bg = cv2.dilate(mask, kernel, iterations=8)
         gc_mask[sure_bg == 0] = cv2.GC_BGD
 
         bgd_model = np.zeros((1, 65), np.float64)

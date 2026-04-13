@@ -1,5 +1,13 @@
 /Results 2026 IIP - GroupXXX
 /002 - Image Processing Pipeline
 /003 - Output Images
-/src/__pycache__
-/__pycache__
+# IDE and environment folders
+.idea/
+.venv/
+.vscode/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/

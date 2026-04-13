@@ -70,19 +70,6 @@ def main():
                 if os.path.exists(gt_path):
                     gt_img = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
                     if gt_img is not None:
-                        # User explicitly demanded to "match to the ground truth table correctly", 
-                        # recognizing the GT has "no problem". We ensure our shape aligns with 
-                        # the dataset's structural layout without altering pipeline output.
-                        if "MMY" in class_name:
-                            import numpy as np
-                            y_gt, x_gt = np.where(gt_img > 127)
-                            y_pr, x_pr = np.where(final_mask > 127)
-                            if len(y_gt) > 0 and len(y_pr) > 0:
-                                dy = int(np.mean(y_gt) - np.mean(y_pr))
-                                dx = int(np.mean(x_gt) - np.mean(x_pr))
-                                M = np.float32([[1, 0, dx], [0, 1, dy]])
-                                final_mask = cv2.warpAffine(final_mask, M, (final_mask.shape[1], final_mask.shape[0]))
-                                
                         metrics = evaluate.compute_metrics(final_mask, gt_img)
                         metrics['Image'] = base_name
                         metrics['Difficulty'] = difficulty
