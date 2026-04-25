@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import shutil
 import config
-from src import utils, pipeline, evaluate
+from src import utils, pipeline
 
 def format_output_name(filename, difficulty, idx):
     # Extracts base name and formats e.g. "MMY 2K-PBC Train (61)-easy_1.jpg"
@@ -25,8 +25,6 @@ def main():
     
     # Setup subdirectories for the pipeline and outputs (now inside RESULTS_DIR)
     utils.init_output_dirs(config.OUTPUT_IMAGES_DIR, config.OUTPUT_PIPELINE_DIR)
-    
-    results = []
     
     for difficulty in config.DIFFICULTIES:
         input_dir = os.path.join(config.CURATED_IMAGES_DIR, difficulty)
@@ -71,32 +69,6 @@ def main():
             utils.save_image(output_img, out_path)
             print(f"    -> Saved output to {out_filename}")
 
-            # Evaluate using Ground Truth
-            try:
-                class_name = base_name.split(' ')[0]
-                # User note: MMY masks for 'Easy' are located in the 'PMY' folder
-                gt_folder = "PMY" if "MMY" in class_name else class_name
-
-                # GT name format is "*_mask.png"
-                gt_path = os.path.join(config.GROUND_TRUTH_DIR, gt_folder, f"{base_name}_mask.png")
-
-                if os.path.exists(gt_path):
-                    gt_img = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
-                    if gt_img is not None:
-                        metrics = evaluate.compute_metrics(final_mask, gt_img)
-                        metrics['Image'] = base_name
-                        metrics['Difficulty'] = difficulty
-                        results.append(metrics)
-                        print(f"    -> GT Evaluated: mIoU={metrics['mIoU']:.4f}, Dice={metrics['Dice']:.4f}")
-                    else:
-                        print(f"    -> GT mask could not be loaded at {gt_path}")
-                else:
-                    print(f"    -> GT mask not found at {gt_path}")
-            except Exception as e:
-                print(f"    Error finding/evaluating GT: {e}")
-
-    evaluate.print_summary(results)
-    
     print(f"\nCompleted! All deliverables are ready in the folder: {os.path.basename(config.RESULTS_DIR)}")
 
 if __name__ == "__main__":

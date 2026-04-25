@@ -1,5 +1,2 @@
 opencv-python
 numpy
-pillow
-pandas
-scikit-learn

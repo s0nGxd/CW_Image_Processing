@@ -1,71 +1,54 @@
 # Blood Cell Semantic Segmentation Pipeline
-## COMP2032 Image Processing Coursework 2026
 
----
+This project is an automated Image Processing Pipeline that segments blood cells from images.
 
-## 1. Intro
-## The Solution: Adaptive Strategy Bank
+## Prerequisites
 
-This project features a fully automated, **Adaptive Strategy Bank** pipeline that achieves **97.2% overall mIoU** on the benchmark dataset. 
+To run this program, you need to have **Python** installed on your computer. If you don't have it, download and install it from [python.org](https://www.python.org/downloads/). Make sure to check the box that says "Add Python to PATH" during installation if you are on Windows.
 
-Rather than relying on a single, fragile algorithm to segment all images perfectly, the pipeline runs **6 independent segmentation strategies** in parallel and selects the best result dynamically based on shape heuristics.
+## How to Run the Program (Step-by-Step)
 
-Key features include:
-1.  **Phase 1: Pre-processing (CLAHE)** - Enhances local contrast on the `L*` channel without modifying color components.
-2.  **Phase 2: Strategy Bank** - Executes 6 methods in parallel:
-    -   `HSV_S + Gaussian + Otsu`
-    -   `LAB_A + Bilateral + Otsu`
-    -   `ColDist + Gaussian + Otsu`
-    -   `LAB_A + Adaptive Threshold`
-    -   `K-Means Clustering (k=3)`
-3.  **Phase 3: Assessment Scoring** - Automatically ranks masks by penalizing unrealistic cell characteristics (e.g., poor circularity or un-centered regions) to choose the best segment.
-4.  **Phase 4: Optimization (GrabCut)** - Polishes the boundaries of the chosen mask utilizing color probability modeling. No manual tuning is involved.
+### For Windows Users:
+1. **Open Command Prompt or PowerShell**: Press the Windows key, type `cmd` or `powershell`, and hit Enter.
+2. **Navigate to the project folder**: Use the `cd` command to go to the folder where this project is located. For example:
+   ```cmd
+   cd path\to\CW_Image_Processing
+   ```
+3. **Install the required libraries**: Run the following command to install the necessary tools:
+   ```cmd
+   pip install -r requirements.txt
+   ```
+4. **Run the pipeline**: Execute the main program by running:
+   ```cmd
+   python main.py
+   ```
 
-For a full academic breakdown of the algorithms used and how they align with the coursework, see `Technique.md`.
+### For Mac Users:
+1. **Open Terminal**: Press `Command + Space`, type `Terminal`, and hit Enter.
+2. **Navigate to the project folder**: Use the `cd` command to go to the folder where this project is located. For example:
+   ```bash
+   cd path/to/CW_Image_Processing
+   ```
+3. **Install the required libraries**: Run the following command to install the necessary tools. (Depending on your Mac setup, you might need to use `pip3` instead of `pip`):
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+4. **Run the pipeline**: Execute the main program by running. (You might need to use `python3` instead of `python`):
+   ```bash
+   python3 main.py
+   ```
 
-## Deliverables
+## Where to find the Output?
 
-The pipeline handles directory structures automatically. All evaluation outputs and results are saved in the submission folder:
-**📁 `Results 2026 IIP - GroupXXX`** 5-stage refinement process:
-1. **Channel Extraction**: Isolating the most discriminative color channel (e.g., Saturation in HSV space).
-2. **Noise Reduction**: Applying **Bilateral Filtering** to smooth background grain while preserving sharp cell boundaries.
-3. **Thresholding**: Using **Otsu’s Bimodal Method** or **Adaptive Gaussian Thresholding** to create a binary mask.
-4. **Morphological Cleanup**: Utilizing Elliptical Opening and Closing operations, followed by **Flood-Fill Hole Closure** to capture pale cytoplasm regions.
-5. **GrabCut Refinement**: Initializing a GrabCut algorithm with the coarse mask to leverage color distribution and achieve pixel-perfect edge alignment.
+Once the program finishes running, it will automatically create a new folder named **`Results 2026 IIP - Group015`** in the same directory. 
 
-## 4. Output
-Running the pipeline generates the following deliverables:
-- **Segmentation Masks**: Binary `.png` files (0/255) for both the curated 9 images and the full dataset.
-- **Segmented Visuals**: JPG images showing the isolated cell against a clean white background.
-- **Evaluation Reports**: A console summary and saved text file containing `mIoU`, `Dice Coefficient`, `Precision`, and `Recall` metrics.
-- **Stage Visualizations**: (Optional) Step-by-step images of the pipeline (01_channel, 02_blurred, etc.) for debugging.
+Inside this folder, you will find:
+- **`001 - Input Images/`**: A copy of the original images.
+- **`002 - Image Processing Pipeline/`**: Visualizations showing the step-by-step processing stages for each image.
+- **`003 - Output Images/`**: The final result—the segmented cells placed on a clean white background.
 
-## 5. Setup Requirements
-The pipeline requires Python 3.x and the following core dependencies:
-- **OpenCV** (`opencv-python`): Core image processing and GrabCut.
-- **NumPy**: Matrix operations and mask manipulation.
-- **Pandas**: Evaluation result logging.
+## Do I need to change any directories before running?
 
-To install dependencies:
-```bash
-pip install opencv-python numpy pandas
-```
+**No.** The code is designed to be fully plug-and-play. It uses dynamic relative paths, meaning it will automatically detect the project folder no matter where you saved it on your computer. 
 
-## 6. Deliverable Generation
-To execute the pipeline on the 9 curated "Conference Paper" images and generate the submission-ready folder:
-
-```bash
-python main.py
-```
-
-### Submission Pack
-The script automatically organizes all required files into a folder named:
-`Results 2026 IIP - GroupXXX`
-
-This folder includes:
-- `002 - Image Processing Pipeline/`: Showing consistent processing stages.
-- `003 - Output Images/`: Final segmented cells on white backgrounds.
-- `final_metrics.txt`: The definitive performance record for the report.
-
-For a deeper dive into the algorithm's mathematics, see [Technique.md](./Technique.md).
-For a history of development iterations, see [CHANGELOG.md](./CHANGELOG.md).
+If you ever want to test the pipeline on your own custom images, simply place them into the respective subfolders (`Easy`, `Medium`, or `Hard`) inside the **`001 - Input Images`** directory before running the program!
